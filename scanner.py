@@ -98,7 +98,7 @@ def make_contact_sheet(images: list[Path], output: Path, cols: int = 5):
     sheet.save(output, quality=88)
 
 
-def scan(video_path: str, progress=None, threshold: float = 27.0) -> Path:
+def scan(video_path: str, progress=None, threshold: float = 27.0, timecode: bool = True) -> Path:
     src = Path(video_path).expanduser().resolve()
     out = src.parent / f"{src.stem}_SCAN"
     thumbs_dir = out / "thumbnails"
@@ -123,6 +123,10 @@ def scan(video_path: str, progress=None, threshold: float = 27.0) -> Path:
         thumb_name = f"shot_{i:04d}.jpg"
         thumb_path = thumbs_dir / thumb_name
         if frame is not None:
+            if timecode:
+                tc = f"{int(start//3600):02d}:{int((start%3600)//60):02d}:{int(start%60):02d}.{int((start%1)*1000):03d}"
+                cv2.rectangle(frame, (12, 12), (250, 52), (0, 0, 0), -1)
+                cv2.putText(frame, tc, (22, 41), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (255,255,255), 2, cv2.LINE_AA)
             cv2.imwrite(str(thumb_path), frame)
             thumb_paths.append(thumb_path)
 
@@ -159,6 +163,7 @@ def scan(video_path: str, progress=None, threshold: float = 27.0) -> Path:
         "source_path": str(src),
         "probe": probe_video(src),
         "shot_count": len(shots),
+        "timecode_on_thumbnails": timecode,
         "shots": [asdict(s) for s in shots],
         "outputs": {
             "contact_sheet": contact.name,

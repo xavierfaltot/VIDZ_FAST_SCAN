@@ -2,21 +2,21 @@ import sys
 from pathlib import Path
 from PySide6.QtCore import QObject,QThread,Signal,Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QApplication,QWidget,QHBoxLayout,QVBoxLayout,QLabel,QPushButton,QFileDialog,QProgressBar,QFrame
+from PySide6.QtWidgets import QApplication,QWidget,QHBoxLayout,QVBoxLayout,QLabel,QPushButton,QFileDialog,QProgressBar,QFrame,QCheckBox
 from scanner import scan
 
 EXTS={".mp4",".mov",".mkv",".avi",".m4v",".webm"}
 
 class Worker(QObject):
     progress=Signal(int,str); finished=Signal(str); failed=Signal(str)
-    def __init__(self,paths): super().__init__(); self.paths=paths
+    def __init__(self,paths,timecode=True): super().__init__(); self.paths=paths; self.timecode=timecode
     def run(self):
         try:
             outs=[]; total=len(self.paths)
             for n,path in enumerate(self.paths,1):
                 def cb(p,msg,n=n,path=path):
                     self.progress.emit(int(((n-1)+p/100)/total*100),f"{n}/{total}  {Path(path).name}  {msg}")
-                outs.append(str(scan(path,cb)))
+                outs.append(str(scan(path,cb,timecode=self.timecode)))
             self.finished.emit("\n".join(outs))
         except Exception as e: self.failed.emit(str(e))
 
@@ -37,8 +37,9 @@ class Window(QWidget):
         root=QHBoxLayout(self); root.setContentsMargins(0,0,0,0); root.setSpacing(0)
 
         rail=QFrame(); rail.setObjectName("rail"); rail.setFixedWidth(235); left=QVBoxLayout(rail); left.setContentsMargins(20,22,20,22); left.setSpacing(14)
-        logo=QLabel(); pix=QPixmap(str(Path(__file__).with_name("logo.png"))); logo.setPixmap(pix.scaled(180,180,Qt.KeepAspectRatio,Qt.SmoothTransformation)); logo.setAlignment(Qt.AlignCenter); left.addWidget(logo)
+        logo=QLabel(); base=Path(getattr(sys,"_MEIPASS",Path(__file__).parent)); pix=QPixmap(str(base/"logo.png")); logo.setPixmap(pix.scaled(180,180,Qt.KeepAspectRatio,Qt.SmoothTransformation)); logo.setAlignment(Qt.AlignCenter); left.addWidget(logo)
         choose=QPushButton("＋  VIDEOS"); choose.clicked.connect(self.choose); folder=QPushButton("▣  FOLDER"); folder.clicked.connect(self.choose_folder)
+        self.tc=QCheckBox("TIME CODE"); self.tc.setChecked(True); left.addWidget(self.tc)
         self.scan_btn=QPushButton("▶  SCAN BATCH"); self.scan_btn.clicked.connect(self.start_scan); self.scan_btn.setEnabled(False)
         clear=QPushButton("×  CLEAR"); clear.clicked.connect(self.clear)
         left.addWidget(choose); left.addWidget(folder); left.addWidget(self.scan_btn); left.addWidget(clear); left.addStretch()
@@ -77,7 +78,7 @@ class Window(QWidget):
     def dropEvent(self,e): self.collect([u.toLocalFile() for u in e.mimeData().urls()])
     def start_scan(self):
         if not self.videos:return
-        QApplication.beep(); self.scan_btn.setEnabled(False); self.thread=QThread(); self.worker=Worker(self.videos); self.worker.moveToThread(self.thread)
+        QApplication.beep(); self.scan_btn.setEnabled(False); self.thread=QThread(); self.worker=Worker(self.videos,self.tc.isChecked()); self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run); self.worker.progress.connect(self.on_progress); self.worker.finished.connect(self.on_finished); self.worker.failed.connect(self.on_failed); self.worker.finished.connect(self.thread.quit); self.worker.failed.connect(self.thread.quit); self.thread.start()
     def on_progress(self,v,t): self.bar.setValue(v); self.status.setText(t)
     def on_finished(self,o): self.scan_btn.setEnabled(True); self.bar.setValue(100); self.status.setText(f"DONE · {len(self.videos)} VIDEOS SCANNED"); QApplication.beep(); QApplication.beep()
