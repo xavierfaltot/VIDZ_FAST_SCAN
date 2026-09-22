@@ -1,7 +1,9 @@
 import sys
 from pathlib import Path
-from PySide6.QtCore import QObject, QThread, Signal, Qt
+from PySide6.QtCore import QObject, QThread, Signal, Qt, QUrl
 from PySide6.QtWidgets import QApplication,QWidget,QVBoxLayout,QHBoxLayout,QLabel,QPushButton,QFileDialog,QProgressBar,QFrame
+from PySide6.QtGui import QPixmap
+from PySide6.QtMultimedia import QSoundEffect
 from scanner import scan
 EXTS={".mp4",".mov",".mkv",".avi",".m4v",".webm"}
 class Worker(QObject):
@@ -20,8 +22,8 @@ class Worker(QObject):
 class Window(QWidget):
     def __init__(self):
         super().__init__(); self.videos=[]; self.setWindowTitle("VIDZ SCAN FAST"); self.resize(760,520); self.setAcceptDrops(True)
-        self.setStyleSheet("""QWidget{background:#f4f1e8;color:#111;font-family:Menlo,monospace} QLabel#title{font-size:38px;font-weight:900;letter-spacing:-2px} QLabel#sub{font-size:13px} QFrame#drop{border:2px dashed #111;border-radius:12px} QPushButton{background:#111;color:#f4f1e8;border:0;padding:16px 22px;font-weight:800} QPushButton:disabled{background:#999} QProgressBar{border:1px solid #111;height:22px;text-align:center} QProgressBar::chunk{background:#111}""")
-        root=QVBoxLayout(self); title=QLabel("VIDZ SCAN FAST"); title.setObjectName("title"); sub=QLabel("VIDEO / FOLDER → BATCH SCAN → UNDERSTAND → MAP"); sub.setObjectName("sub"); root.addWidget(title); root.addWidget(sub)
+        self.setStyleSheet("""QWidget{background:#fff;color:#111;font-family:Menlo,monospace} QLabel#title{font-size:38px;font-weight:900;letter-spacing:-2px} QLabel#sub{font-size:13px} QFrame#drop{border:2px dashed #111;border-radius:12px;background:#fff} QPushButton{background:#111;color:#fff;border:0;padding:16px 22px;font-weight:800} QPushButton:disabled{background:#bbb} QProgressBar{border:1px solid #111;height:22px;text-align:center;background:#fff} QProgressBar::chunk{background:#111}""")
+        root=QVBoxLayout(self); logo=QLabel(); pix=QPixmap(str(Path(__file__).with_name("logo.png"))); logo.setPixmap(pix.scaled(190,190,Qt.KeepAspectRatio,Qt.SmoothTransformation)); logo.setAlignment(Qt.AlignCenter); sub=QLabel("VIDEO / FOLDER → BATCH SCAN → UNDERSTAND → MAP"); sub.setObjectName("sub"); sub.setAlignment(Qt.AlignCenter); root.addWidget(logo); root.addWidget(sub)
         self.drop=QFrame(); self.drop.setObjectName("drop"); dl=QVBoxLayout(self.drop); self.file_label=QLabel("DROP VIDEOS OR FOLDER HERE"); self.file_label.setAlignment(Qt.AlignCenter); self.file_label.setStyleSheet("font-size:22px;font-weight:800;")
         buttons=QHBoxLayout(); choose=QPushButton("CHOOSE VIDEOS"); folder=QPushButton("CHOOSE FOLDER"); choose.clicked.connect(self.choose); folder.clicked.connect(self.choose_folder); buttons.addWidget(choose); buttons.addWidget(folder)
         dl.addStretch(); dl.addWidget(self.file_label); dl.addLayout(buttons); dl.addStretch(); root.addWidget(self.drop,1)
@@ -45,9 +47,10 @@ class Window(QWidget):
     def dropEvent(self,e): self.collect([u.toLocalFile() for u in e.mimeData().urls()])
     def start_scan(self):
         if not self.videos:return
+        QApplication.beep()
         self.scan_btn.setEnabled(False); self.thread=QThread(); self.worker=Worker(self.videos); self.worker.moveToThread(self.thread); self.thread.started.connect(self.worker.run); self.worker.progress.connect(self.on_progress); self.worker.finished.connect(self.on_finished); self.worker.failed.connect(self.on_failed); self.worker.finished.connect(self.thread.quit); self.worker.failed.connect(self.thread.quit); self.thread.start()
     def on_progress(self,v,t): self.bar.setValue(v); self.status.setText(t)
-    def on_finished(self,o): self.scan_btn.setEnabled(True); self.bar.setValue(100); self.status.setText(f"DONE · {len(self.videos)} VIDEOS SCANNED")
+    def on_finished(self,o): self.scan_btn.setEnabled(True); self.bar.setValue(100); self.status.setText(f"DONE · {len(self.videos)} VIDEOS SCANNED"); QApplication.beep(); QApplication.beep()
     def on_failed(self,e): self.scan_btn.setEnabled(True); self.status.setText(f"ERROR → {e}")
 if __name__=="__main__":
     app=QApplication(sys.argv); win=Window(); win.show(); sys.exit(app.exec())
